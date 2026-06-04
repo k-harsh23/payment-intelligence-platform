@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Spark
+bronze/
+bronze_checkpoint/
+
+# Spark downloaded packages
+.ivy2/
+
+# IDE
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
