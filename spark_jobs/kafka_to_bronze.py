@@ -14,6 +14,7 @@ kafka_df = (
     .option("kafka.bootstrap.servers", "payment-kafka:29092")
     .option("subscribe", "transactions_raw")
     .option("startingOffsets", "latest")
+    .option("failOnDataLoss", "false")
     .load()
 )
 

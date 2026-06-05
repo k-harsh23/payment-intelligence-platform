@@ -1,20 +1,40 @@
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Spark
+# Virtual Environments
+venv/
+.venv/
+
+# Spark Output Data
 bronze/
-bronze_checkpoint/
+silver/
+gold/
 
-# Spark downloaded packages
+# Spark Checkpoints
+bronze_checkpoint/
+silver_checkpoint/
+gold_checkpoint/
+
+# Spark Dependencies
 .ivy2/
+
+# Airflow
+airflow/logs/
+airflow/plugins/__pycache__/
 
 # IDE
 .vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Environment Files
+.env
 
 # Logs
 *.log
-
-# OS
-.DS_Store
-Thumbs.db
