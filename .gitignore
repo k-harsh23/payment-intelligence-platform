@@ -3,23 +3,30 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.log
 
 # Virtual Environments
 venv/
 .venv/
+env/
 
-# Spark Output Data
-bronze/
-silver/
-gold/
+# Spark
+.metastore_db/
+spark-warehouse/
+*.crc
 
-# Spark Checkpoints
+# Checkpoints
 bronze_checkpoint/
 silver_checkpoint/
 gold_checkpoint/
 
-# Spark Dependencies
-.ivy2/
+# Generated Data
+bronze/
+silver/
+gold/
+
+# Spark Metadata
+_spark_metadata/
 
 # Airflow
 airflow/logs/
@@ -33,8 +40,15 @@ airflow/plugins/__pycache__/
 .DS_Store
 Thumbs.db
 
-# Environment Files
-.env
+# Jupyter
+.ipynb_checkpoints/
 
-# Logs
-*.log
+# Temporary Files
+tmp/
+temp/
+
+# Local Test Files
+test.txt
+
+# Ivy Cache
+.ivy2/
