@@ -15,4 +15,4 @@ CREATE TABLE IF NOT EXISTS fraud_alerts (
     fraud_score DECIMAL(5,2),
     reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);c
+);
