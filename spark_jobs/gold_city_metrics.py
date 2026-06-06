@@ -4,14 +4,6 @@ from pyspark.sql.functions import (
     sum,
     avg
 )
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    StringType,
-    DoubleType,
-    TimestampType,
-    BooleanType
-)
 
 spark = (
     SparkSession.builder
@@ -21,35 +13,37 @@ spark = (
 
 spark.sparkContext.setLogLevel("WARN")
 
-# Silver schema
-silver_schema = StructType([
-    StructField("transaction_id", StringType(), True),
-    StructField("user_id", StringType(), True),
-    StructField("merchant_id", StringType(), True),
-    StructField("amount", DoubleType(), True),
-    StructField("payment_type", StringType(), True),
-    StructField("city", StringType(), True),
-    StructField("transaction_timestamp", StringType(), True),
-    StructField("transaction_time", TimestampType(), True),
-    StructField("is_high_value", BooleanType(), True),
-    StructField("is_night_transaction", BooleanType(), True),
-    StructField("risk_level", StringType(), True)
-])
+# --------------------------------------------------
+# Infer Silver Schema
+# --------------------------------------------------
 
+silver_schema = (
+    spark.read
+    .parquet("/app/data/silver")
+    .schema
+)
+
+# --------------------------------------------------
 # Read Silver Stream
+# --------------------------------------------------
+
 silver_df = (
     spark.readStream
     .schema(silver_schema)
-    .parquet("/app/silver")
+    .option("maxFilesPerTrigger", 1)
+    .parquet("/app/data/silver")
 )
 
+# --------------------------------------------------
+# Process Each Batch
+# --------------------------------------------------
 
 def process_batch(batch_df, batch_id):
 
     print(f"Processing Batch: {batch_id}")
 
-    # Read complete Silver layer
-    silver_full_df = spark.read.parquet("/app/silver")
+    # Read complete Silver layer for full aggregation
+    silver_full_df = spark.read.parquet("/app/data/silver")
 
     city_metrics_df = (
         silver_full_df
@@ -63,23 +57,28 @@ def process_batch(batch_df, batch_id):
 
     print("City Metrics Count:", city_metrics_df.count())
 
+    city_metrics_df.show(10, truncate=False)
+
     (
         city_metrics_df
         .coalesce(1)
         .write
         .mode("overwrite")
-        .parquet("/app/gold/city_metrics")
+        .parquet("/app/data/gold/city_metrics")
     )
 
-    print(f"Processed batch: {batch_id}")
+    print(f"Processed Batch: {batch_id}")
 
+# --------------------------------------------------
+# Start Stream
+# --------------------------------------------------
 
 query = (
     silver_df.writeStream
     .foreachBatch(process_batch)
     .option(
         "checkpointLocation",
-        "/app/gold_checkpoint/city_metrics"
+        "/app/checkpoints/gold/city_metrics"
     )
     .start()
 )

@@ -21,12 +21,10 @@ spark = (
 
 spark.sparkContext.setLogLevel("WARN")
 
-# Bronze schema
-bronze_schema = StructType([
-    StructField("json_data", StringType(), True)
-])
+# --------------------------------------------------
+# Transaction Schema
+# --------------------------------------------------
 
-# Transaction schema
 transaction_schema = StructType([
     StructField("transaction_id", StringType(), True),
     StructField("user_id", StringType(), True),
@@ -37,64 +35,111 @@ transaction_schema = StructType([
     StructField("transaction_timestamp", StringType(), True)
 ])
 
-# Read Bronze Layer
+# --------------------------------------------------
+# Bronze Schema
+# --------------------------------------------------
+
+bronze_schema = (
+    spark.read
+    .parquet("/app/data/bronze")
+    .schema
+)
+
+# --------------------------------------------------
+# Read Bronze Stream
+# --------------------------------------------------
+
 bronze_df = (
     spark.readStream
     .schema(bronze_schema)
-    .parquet("/app/bronze")
+    .format("parquet")
+    .option("maxFilesPerTrigger", 1)
+    .load("/app/data/bronze")
 )
 
-# Parse JSON and enrich data
-silver_df = (
+# --------------------------------------------------
+# Parse JSON
+# --------------------------------------------------
+
+parsed_df = (
     bronze_df
-    .select(
+    .withColumn(
+        "parsed_json",
         from_json(
             col("json_data"),
             transaction_schema
-        ).alias("data")
+        )
     )
-    .select("data.*")
+)
 
-    .withColumn(
-        "transaction_time",
-        to_timestamp(col("transaction_timestamp"))
+# --------------------------------------------------
+# Build Silver Layer
+# --------------------------------------------------
+
+silver_df = (
+    parsed_df.select(
+        col("parsed_json.transaction_id").alias("transaction_id"),
+        col("parsed_json.user_id").alias("user_id"),
+        col("parsed_json.merchant_id").alias("merchant_id"),
+        col("parsed_json.amount").alias("amount"),
+        col("parsed_json.payment_type").alias("payment_type"),
+        col("parsed_json.city").alias("city"),
+        to_timestamp(
+            col("parsed_json.transaction_timestamp")
+        ).alias("transaction_timestamp")
     )
+    .filter(col("transaction_id").isNotNull())
+    .filter(col("amount").isNotNull())
+)
 
+# --------------------------------------------------
+# Feature Engineering
+# --------------------------------------------------
+
+silver_df = (
+    silver_df
+
+    # High Value Transaction
     .withColumn(
         "is_high_value",
-        when(col("amount") > 4000, True)
+        when(col("amount") > 3000, True)
         .otherwise(False)
     )
 
+    # Night Transaction
     .withColumn(
         "is_night_transaction",
         when(
-            hour(col("transaction_time")).between(0, 4),
+            hour(col("transaction_timestamp")).between(0, 6),
             True
         ).otherwise(False)
     )
 
+    # Risk Level
     .withColumn(
         "risk_level",
-        when(col("amount") > 4500, "HIGH")
-        .when(col("amount") > 4000, "MEDIUM")
+        when(col("amount") > 4000, "HIGH")
+        .when(col("amount") > 2000, "MEDIUM")
         .otherwise("LOW")
     )
-
-    .filter(col("transaction_id").isNotNull())
-    .filter(col("amount") > 0)
 )
 
-# Write to Silver Layer
+# --------------------------------------------------
+# Write Silver Layer
+# --------------------------------------------------
+
 query = (
     silver_df.writeStream
     .format("parquet")
-    .option("path", "/app/silver")
-    .option("checkpointLocation", "/app/silver_checkpoint")
     .outputMode("append")
+    .option("path", "/app/data/silver")
+    .option(
+        "checkpointLocation",
+        "/app/checkpoints/silver"
+    )
     .start()
 )
 
-print("Silver Streaming Started...")
+print("Silver Streaming Started")
 
 query.awaitTermination()
