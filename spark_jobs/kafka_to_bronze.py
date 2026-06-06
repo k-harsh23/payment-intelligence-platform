@@ -1,4 +1,5 @@
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
 
 spark = (
     SparkSession.builder
@@ -18,23 +19,22 @@ kafka_df = (
     .option("kafka.bootstrap.servers", "payment-kafka:29092")
     .option("subscribe", "transactions_raw")
     .option("startingOffsets", "latest")
-    .option("failOnDataLoss", "false")
     .load()
 )
 
-raw_df = kafka_df.selectExpr(
-    "CAST(value AS STRING) as json_data"
+bronze_df = kafka_df.select(
+    col("value").cast("string").alias("json_data")
 )
 
 query = (
-    raw_df.writeStream
+    bronze_df.writeStream
     .format("parquet")
-    .option("path", "/app/bronze")
-    .option("checkpointLocation", "/app/bronze_checkpoint")
     .outputMode("append")
+    .option("path", "/app/data/bronze")
+    .option("checkpointLocation", "/app/checkpoints/bronze")
     .start()
 )
 
-print("Bronze Streaming Started...")
+print("Bronze Streaming Started")
 
 query.awaitTermination()

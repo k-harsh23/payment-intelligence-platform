@@ -29,6 +29,10 @@ services:
     ports:
       - "2181:2181"
 
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+
     healthcheck:
       test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181"]
       interval: 10s
@@ -95,3 +99,5 @@ services:
 volumes:
   postgres_data:
   kafka_data:
+  zookeeper_data:
+  zookeeper_log:
