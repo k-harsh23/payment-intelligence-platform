@@ -2,7 +2,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     count,
     sum,
-    avg
+    avg,
+    current_timestamp
 )
 
 spark = (
@@ -42,31 +43,52 @@ def process_batch(batch_df, batch_id):
 
     print(f"Processing Batch: {batch_id}")
 
-    print("Incoming Records:", batch_df.count())
+    # Read COMPLETE Silver Layer
+    silver_full_df = spark.read.parquet(
+        "/app/data/silver"
+    )
+
+    print(
+        "Total Silver Records:",
+        silver_full_df.count()
+    )
 
     payment_metrics_df = (
-        batch_df
+        silver_full_df
         .groupBy("payment_type")
         .agg(
             count("*").alias("transaction_count"),
             sum("amount").alias("total_amount"),
             avg("amount").alias("avg_amount")
         )
+        .withColumn(
+            "snapshot_time",
+            current_timestamp()
+        )
     )
 
-    print("Aggregated Records:", payment_metrics_df.count())
+    print(
+        "Aggregated Records:",
+        payment_metrics_df.count()
+    )
 
-    payment_metrics_df.show(truncate=False)
+    payment_metrics_df.show(
+        truncate=False
+    )
 
     (
         payment_metrics_df
         .coalesce(1)
         .write
-        .mode("overwrite")
-        .parquet("/app/data/gold/payment_metrics")
+        .mode("append")
+        .parquet(
+            "/app/data/gold/payment_metrics_history"
+        )
     )
 
-    print(f"Processed Batch: {batch_id}")
+    print(
+        f"Historical Snapshot Written: {batch_id}"
+    )
 
 # --------------------------------------------------
 # Start Stream
@@ -77,11 +99,14 @@ query = (
     .foreachBatch(process_batch)
     .option(
         "checkpointLocation",
-        "/app/checkpoints/gold/payment_metrics"
+        "/app/checkpoints/gold/payment_metrics_history"
     )
+    .trigger(processingTime="1 minute")
     .start()
 )
 
-print("Gold Payment Metrics Streaming Started...")
+print(
+    "Gold Payment Metrics History Streaming Started..."
+)
 
 query.awaitTermination()
