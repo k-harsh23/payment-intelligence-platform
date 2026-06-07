@@ -1,3 +1,10 @@
+"""
+One-time historical backfill job.
+
+Used to load existing Gold Parquet history
+into PostgreSQL serving tables.
+"""
+
 from pyspark.sql import SparkSession
 
 spark = (
